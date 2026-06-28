@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Quiz ABCD</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    margin: 0;
+    background: #f0f2f5;
+    color: #1a1a2e;
+    line-height: 1.5;
+  }
+  .wrap {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 24px 16px 60px;
+  }
+  h1 { margin: 0 0 4px; font-size: 28px; }
+  .sub { color: #666; margin: 0 0 20px; }
+
+  .timer {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: #1a1a2e;
+    color: #fff;
+    border-radius: 12px;
+    padding: 14px 18px;
+    margin-bottom: 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    box-shadow: 0 4px 14px rgba(0,0,0,.15);
+  }
+  .timer .label { font-size: 13px; opacity: .8; }
+  .timer .val { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .timer .away { color: #ff6b6b; }
+
+  .q {
+    background: #fff;
+    border-radius: 12px;
+    padding: 18px 20px;
+    margin-bottom: 16px;
+    box-shadow: 0 2px 8px rgba(0,0,0,.06);
+  }
+  .q .num { font-weight: 700; }
+  .q p { margin: 0 0 14px; font-size: 17px; }
+
+  select {
+    width: 100%;
+    padding: 12px 14px;
+    font-size: 16px;
+    border: 2px solid #d0d4dc;
+    border-radius: 10px;
+    background: #fafbfc;
+    color: #1a1a2e;
+    cursor: pointer;
+    appearance: none;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23666' stroke-width='2'><path d='M6 9l6 6 6-6'/></svg>");
+    background-repeat: no-repeat;
+    background-position: right 14px center;
+  }
+  select:focus { outline: none; border-color: #4361ee; }
+
+  .feedback { margin-top: 10px; font-weight: 600; font-size: 14px; min-height: 20px; }
+  .feedback.ok { color: #2a9d4a; }
+  .feedback.bad { color: #d33; }
+
+  button {
+    background: #4361ee;
+    color: #fff;
+    border: none;
+    padding: 14px 24px;
+    font-size: 17px;
+    font-weight: 700;
+    border-radius: 10px;
+    cursor: pointer;
+    width: 100%;
+  }
+  button:hover { background: #3550c8; }
+
+  .result {
+    margin-top: 18px;
+    padding: 18px;
+    border-radius: 12px;
+    background: #fff;
+    text-align: center;
+    font-size: 20px;
+    font-weight: 700;
+    display: none;
+    box-shadow: 0 2px 8px rgba(0,0,0,.06);
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Quiz ABCD</h1>
+  <p class="sub">Rozwiń listę przy każdym pytaniu i wybierz odpowiedź.</p>
+
+  <div class="timer">
+    <div>
+      <div class="label">Czas na stronie</div>
+      <div class="val" id="onTime">00:00</div>
+    </div>
+    <div>
+      <div class="label">Czas poza stroną</div>
+      <div class="val away" id="awayTime">00:00</div>
+    </div>
+  </div>
+
+  <div id="quiz"></div>
+
+  <button id="submitBtn">Sprawdź wynik</button>
+  <div class="result" id="result"></div>
+</div>
+
+<script>
+  // ---- Pytania ----
+  const questions = [
+    {
+      q: "Która planeta jest najbliżej Słońca?",
+      opts: ["Wenus", "Merkury", "Mars", "Ziemia"],
+      correct: 1
+    },
+    {
+      q: "Ile to jest 7 × 8?",
+      opts: ["54", "56", "64", "48"],
+      correct: 1
+    },
+    {
+      q: "Kto napisał „Pana Tadeusza”?",
+      opts: ["Juliusz Słowacki", "Henryk Sienkiewicz", "Adam Mickiewicz", "Bolesław Prus"],
+      correct: 2
+    },
+    {
+      q: "Jaki jest symbol chemiczny złota?",
+      opts: ["Au", "Ag", "Gd", "Go"],
+      correct: 0
+    },
+    {
+      q: "Stolicą Australii jest:",
+      opts: ["Sydney", "Melbourne", "Canberra", "Perth"],
+      correct: 2
+    }
+  ];
+
+  const letters = ["A", "B", "C", "D"];
+  const quizEl = document.getElementById("quiz");
+
+  questions.forEach((item, i) => {
+    const div = document.createElement("div");
+    div.className = "q";
+    let options = '<option value="">— wybierz odpowiedź —</option>';
+    item.opts.forEach((o, j) => {
+      options += `<option value="${j}">${letters[j]}) ${o}</option>`;
+    });
+    div.innerHTML = `
+      <p><span class="num">${i + 1}.</span> ${item.q}</p>
+      <select data-idx="${i}">${options}</select>
+      <div class="feedback" id="fb${i}"></div>
+    `;
+    quizEl.appendChild(div);
+  });
+
+  // ---- Sprawdzanie ----
+  document.getElementById("submitBtn").addEventListener("click", () => {
+    let score = 0;
+    let answeredAll = true;
+    document.querySelectorAll("select").forEach(sel => {
+      const idx = +sel.dataset.idx;
+      const fb = document.getElementById("fb" + idx);
+      const val = sel.value;
+      if (val === "") {
+        answeredAll = false;
+        fb.textContent = "Nie wybrano odpowiedzi";
+        fb.className = "feedback bad";
+        return;
+      }
+      if (+val === questions[idx].correct) {
+        score++;
+        fb.textContent = "Dobrze ✓";
+        fb.className = "feedback ok";
+      } else {
+        const c = questions[idx].correct;
+        fb.textContent = `Źle — poprawna: ${letters[c]}) ${questions[idx].opts[c]}`;
+        fb.className = "feedback bad";
+      }
+    });
+    const res = document.getElementById("result");
+    res.style.display = "block";
+    res.textContent = `Twój wynik: ${score} / ${questions.length}`
+      + (answeredAll ? "" : " (nie odpowiedziałeś na wszystkie)");
+    res.scrollIntoView({ behavior: "smooth", block: "center" });
+  });
+
+  // ---- Licznik czasu na stronie / poza stroną ----
+  let onSeconds = 0;
+  let awaySeconds = 0;
+  let isAway = false;
+
+  function fmt(s) {
+    const m = Math.floor(s / 60).toString().padStart(2, "0");
+    const sec = (s % 60).toString().padStart(2, "0");
+    return `${m}:${sec}`;
+  }
+
+  setInterval(() => {
+    if (isAway) {
+      awaySeconds++;
+      document.getElementById("awayTime").textContent = fmt(awaySeconds);
+    } else {
+      onSeconds++;
+      document.getElementById("onTime").textContent = fmt(onSeconds);
+    }
+  }, 1000);
+
+  // Wykrywanie opuszczenia strony (zmiana karty, minimalizacja, klik w inne okno)
+  document.addEventListener("visibilitychange", () => {
+    isAway = document.hidden;
+  });
+  window.addEventListener("blur", () => { isAway = true; });
+  window.addEventListener("focus", () => { isAway = false; });
+</script>
+</body>
+</html>
